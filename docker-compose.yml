@@ -1,0 +1,15 @@
+# Local development database only. Production uses Neon.
+services:
+  db:
+    image: postgres:17
+    container_name: budget-tracker-db
+    environment:
+      POSTGRES_USER: budget
+      POSTGRES_PASSWORD: budget_dev_only
+      POSTGRES_DB: budget_tracker
+    ports:
+      - "5440:5432"
+    volumes:
+      - budget_tracker_data:/var/lib/postgresql/data
+volumes:
+  budget_tracker_data:

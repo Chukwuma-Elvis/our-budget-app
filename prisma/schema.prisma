@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Account {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  users             User[]
+  invites           Invite[]
+  categories        Category[]
+  budgets           Budget[]
+  expenses          Expense[]
+  recurringExpenses RecurringExpense[]
+  expenseAudits     ExpenseAudit[]
+
+  @@map("accounts")
+}
+
+model User {
+  id             String    @id @default(uuid()) @db.Uuid
+  accountId      String    @map("account_id") @db.Uuid
+  phone          String    @unique
+  displayName    String    @map("display_name")
+  passwordHash   String    @map("password_hash")
+  failedAttempts Int       @default(0) @map("failed_attempts")
+  lockedUntil    DateTime? @map("locked_until") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  account           Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  passkeys          Passkey[]
+  challenges        AuthChallenge[]
+  invitesCreated    Invite[]
+  categoriesCreated Category[]
+  budgetsUpdated    Budget[]
+  expensesCreated   Expense[]          @relation("ExpenseCreatedBy")
+  expensesUpdated   Expense[]          @relation("ExpenseUpdatedBy")
+  recurringCreated  RecurringExpense[]
+  audits            ExpenseAudit[]
+
+  @@index([accountId])
+  @@map("users")
+}
+
+model Passkey {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  credentialId String    @unique @map("credential_id")
+  publicKey    Bytes     @map("public_key")
+  counter      BigInt    @default(0)
+  transports   String[]
+  deviceLabel  String?   @map("device_label")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastUsedAt   DateTime? @map("last_used_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("passkeys")
+}
+
+model AuthChallenge {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String?   @map("user_id") @db.Uuid
+  kind      String // passkey_register | passkey_login | password_reset
+  valueHash String    @map("value_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([valueHash])
+  @@map("auth_challenges")
+}
+
+model Invite {
+  id        String    @id @default(uuid()) @db.Uuid
+  accountId String    @map("account_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  createdBy String?   @map("created_by") @db.Uuid
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  creator User?   @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@map("invites")
+}
+
+model Category {
+  id         String    @id @default(uuid()) @db.Uuid
+  accountId  String    @map("account_id") @db.Uuid
+  name       String
+  color      String    @default("#64748b")
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz
+  createdBy  String?   @map("created_by") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  account   Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  creator   User?              @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  budgets   Budget[]
+  expenses  Expense[]
+  recurring RecurringExpense[]
+
+  @@index([accountId])
+  @@map("categories")
+}
+
+model Budget {
+  id         String   @id @default(uuid()) @db.Uuid
+  accountId  String   @map("account_id") @db.Uuid
+  categoryId String   @map("category_id") @db.Uuid
+  month      DateTime @db.Date // always the first day of the month
+  amount     Decimal  @db.Decimal(14, 2)
+  updatedBy  String?  @map("updated_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  account  Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  updater  User?    @relation(fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@unique([categoryId, month])
+  @@index([accountId, month])
+  @@map("budgets")
+}
+
+model Expense {
+  id          String   @id @default(uuid()) @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  categoryId  String   @map("category_id") @db.Uuid
+  itemName    String   @map("item_name")
+  amount      Decimal  @db.Decimal(14, 2)
+  spentOn     DateTime @map("spent_on") @db.Date
+  note        String?
+  createdBy   String   @map("created_by") @db.Uuid
+  updatedBy   String?  @map("updated_by") @db.Uuid
+  recurringId String?  @map("recurring_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  account   Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category  Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  creator   User              @relation("ExpenseCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  updater   User?             @relation("ExpenseUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
+  recurring RecurringExpense? @relation(fields: [recurringId], references: [id], onDelete: SetNull)
+
+  @@index([accountId, spentOn(sort: Desc)])
+  @@index([categoryId, spentOn])
+  @@index([accountId, createdBy, spentOn])
+  @@map("expenses")
+}
+
+model ExpenseAudit {
+  id        String   @id @default(uuid()) @db.Uuid
+  accountId String   @map("account_id") @db.Uuid
+  expenseId String   @map("expense_id") @db.Uuid
+  action    String // create | update | delete
+  actorId   String?  @map("actor_id") @db.Uuid
+  before    Json?
+  after     Json?
+  at        DateTime @default(now()) @db.Timestamptz
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([accountId, at(sort: Desc)])
+  @@index([expenseId])
+  @@map("expense_audit")
+}
+
+model RecurringExpense {
+  id         String   @id @default(uuid()) @db.Uuid
+  accountId  String   @map("account_id") @db.Uuid
+  categoryId String   @map("category_id") @db.Uuid
+  itemName   String   @map("item_name")
+  amount     Decimal  @db.Decimal(14, 2)
+  frequency  String // weekly | monthly | yearly
+  nextRunOn  DateTime @map("next_run_on") @db.Date
+  active     Boolean  @default(true)
+  createdBy  String   @map("created_by") @db.Uuid
+
+  account  Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  creator  User      @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  expenses Expense[]
+
+  @@index([active, nextRunOn])
+  @@map("recurring_expenses")
+}
