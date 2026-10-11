@@ -352,6 +352,7 @@ async function callGroq(
         ],
       },
     ],
+    max_tokens: 800,
     temperature: 0.1,
   };
   if (useJsonFormat) {
