@@ -326,6 +326,68 @@ async function callOpenAi(
   return text;
 }
 
+async function callGroq(
+  apiKey: string,
+  model: string,
+  base64Data: string,
+  mimeType: string,
+  prompt: string,
+): Promise<string> {
+  const cleanKey = apiKey.trim().replace(/^["']|["']$/g, "");
+  const normalizedMime = mimeType === "image/jpg" ? "image/jpeg" : mimeType;
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${cleanKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${normalizedMime};base64,${base64Data}`,
+              },
+            },
+          ],
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    let parsedMessage = errorBody;
+    try {
+      const errJson = JSON.parse(errorBody) as { error?: { message?: string } };
+      if (errJson?.error?.message) {
+        parsedMessage = errJson.error.message;
+      }
+    } catch {
+      // retain errorBody
+    }
+    throw new Error(`Groq (${model}) ${response.status}: ${parsedMessage}`);
+  }
+
+  const json = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+
+  const text = json.choices?.[0]?.message?.content;
+  if (!text) {
+    throw new Error(`Groq (${model}) returned an empty response`);
+  }
+
+  return text;
+}
+
 export async function scanReceipt(
   accountId: string,
   imageBase64: string,
@@ -338,17 +400,19 @@ export async function scanReceipt(
     throw badRequest("No image data provided");
   }
 
+  const rawGroqKey = process.env.GROQ_API_KEY;
   const rawGeminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   const rawOpenaiKey = process.env.OPENAI_API_KEY;
 
+  const groqKey = rawGroqKey ? rawGroqKey.trim().replace(/^["']|["']$/g, "") : null;
   const geminiKey = rawGeminiKey ? rawGeminiKey.trim().replace(/^["']|["']$/g, "") : null;
   const openaiKey = rawOpenaiKey ? rawOpenaiKey.trim().replace(/^["']|["']$/g, "") : null;
 
-  if (!geminiKey && !openaiKey) {
+  if (!groqKey && !geminiKey && !openaiKey) {
     throw new AppError(
       503,
       "ai_not_configured",
-      "Receipt scanning requires an API key. Please add GEMINI_API_KEY to your environment variables.",
+      "Receipt scanning requires an AI key. Please add GROQ_API_KEY or GEMINI_API_KEY to your environment variables.",
     );
   }
 
@@ -356,7 +420,20 @@ export async function scanReceipt(
   let rawAiText: string | null = null;
   let lastError: Error | null = null;
 
-  if (geminiKey) {
+  if (groqKey) {
+    const groqModels = ["llama-3.2-11b-vision-preview", "llama-3.2-90b-vision-preview"];
+    for (const model of groqModels) {
+      try {
+        rawAiText = await callGroq(groqKey, model, base64Data, mimeType, prompt);
+        if (rawAiText) break;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        console.warn(`Groq model ${model} failed:`, lastError.message);
+      }
+    }
+  }
+
+  if (!rawAiText && geminiKey) {
     const models = ["gemini-2.0-flash", "gemini-1.5-flash"];
     for (const model of models) {
       try {
