@@ -14,6 +14,7 @@ import {
   type Me,
 } from "@/lib/client";
 import { formatDate, monthLabel } from "@/lib/dates";
+import { parseAmount } from "@/lib/money";
 
 type AuditEntry = {
   id: string;
@@ -28,6 +29,8 @@ type AuditEntry = {
 function EditModal({ expense, onClose, onSaved }: { expense: Expense; onClose: () => void; onSaved: () => void }) {
   const categories = useFetch<{ categories: Category[] }>("/categories");
   const [itemName, setItemName] = useState(expense.itemName);
+  const [quantity, setQuantity] = useState("1");
+  const [unitPrice, setUnitPrice] = useState(expense.amount);
   const [amount, setAmount] = useState(expense.amount);
   const [categoryId, setCategoryId] = useState(expense.category.id);
   const [spentOn, setSpentOn] = useState(expense.spentOn);
@@ -35,6 +38,40 @@ function EditModal({ expense, onClose, onSaved }: { expense: Expense; onClose: (
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+
+  function onQuantityChange(val: string) {
+    setQuantity(val);
+    const q = Number(val);
+    if (q > 0) {
+      const parsedUnit = parseAmount(unitPrice);
+      if (parsedUnit !== null) {
+        setAmount((q * Number(parsedUnit)).toFixed(2));
+      } else {
+        const parsedTotal = parseAmount(amount);
+        if (parsedTotal !== null) {
+          setUnitPrice((Number(parsedTotal) / q).toFixed(2));
+        }
+      }
+    }
+  }
+
+  function onUnitPriceChange(val: string) {
+    setUnitPrice(val);
+    const parsed = parseAmount(val);
+    const q = Number(quantity) > 0 ? Number(quantity) : 1;
+    if (parsed !== null) {
+      setAmount((q * Number(parsed)).toFixed(2));
+    }
+  }
+
+  function onAmountChange(val: string) {
+    setAmount(val);
+    const parsed = parseAmount(val);
+    const q = Number(quantity) > 0 ? Number(quantity) : 1;
+    if (parsed !== null) {
+      setUnitPrice((Number(parsed) / q).toFixed(2));
+    }
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -62,8 +99,30 @@ function EditModal({ expense, onClose, onSaved }: { expense: Expense; onClose: (
         <Field label="Item" error={fields.itemName}>
           <input className="input" value={itemName} onChange={(e) => setItemName(e.target.value)} />
         </Field>
-        <Field label="Price (₦)" error={fields.amount}>
-          <input className="input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Quantity">
+            <input
+              className="input"
+              type="number"
+              min="1"
+              step="any"
+              value={quantity}
+              onChange={(e) => onQuantityChange(e.target.value)}
+              placeholder="1"
+            />
+          </Field>
+          <Field label="Unit price (₦)">
+            <input
+              className="input"
+              inputMode="decimal"
+              value={unitPrice}
+              onChange={(e) => onUnitPriceChange(e.target.value)}
+              placeholder="0.00"
+            />
+          </Field>
+        </div>
+        <Field label="Total price (₦)" error={fields.amount}>
+          <input className="input" inputMode="decimal" value={amount} onChange={(e) => onAmountChange(e.target.value)} />
         </Field>
         <Field label="Category" error={fields.categoryId}>
           <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>

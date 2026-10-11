@@ -19,12 +19,58 @@ export default function LogExpensePage() {
   const [spentOn, setSpentOn] = useState(todayLagos());
   const [categoryId, setCategoryId] = useState("");
   const [itemName, setItemName] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [unitPrice, setUnitPrice] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<string | null>(null);
+
+  function onQuantityChange(val: string) {
+    setQuantity(val);
+    const q = Number(val);
+    if (q > 0) {
+      const parsedUnit = parseAmount(unitPrice);
+      if (parsedUnit !== null) {
+        setAmount((q * Number(parsedUnit)).toFixed(2));
+      } else {
+        const parsedTotal = parseAmount(amount);
+        if (parsedTotal !== null) {
+          setUnitPrice((Number(parsedTotal) / q).toFixed(2));
+        }
+      }
+    }
+  }
+
+  function onUnitPriceChange(val: string) {
+    setUnitPrice(val);
+    const parsed = parseAmount(val);
+    const q = Number(quantity) > 0 ? Number(quantity) : 1;
+    if (parsed !== null) {
+      setAmount((q * Number(parsed)).toFixed(2));
+    }
+  }
+
+  function onAmountChange(val: string) {
+    setAmount(val);
+    const parsed = parseAmount(val);
+    const q = Number(quantity) > 0 ? Number(quantity) : 1;
+    if (parsed !== null) {
+      setUnitPrice((Number(parsed) / q).toFixed(2));
+    }
+  }
+
+  const calcBreakdown = useMemo(() => {
+    const q = Number(quantity);
+    const parsedUnit = parseAmount(unitPrice);
+    const parsedTotal = parseAmount(amount);
+    if (q > 1 && parsedUnit !== null && parsedTotal !== null) {
+      return `${q} items × ${formatNaira(parsedUnit)} = ${formatNaira(parsedTotal)}`;
+    }
+    return null;
+  }, [quantity, unitPrice, amount]);
 
   const entryMonth = spentOn.slice(0, 7);
   const summary = useFetch<Summary>(`/reports/summary?month=${entryMonth}`);
@@ -46,9 +92,18 @@ export default function LogExpensePage() {
     setFields({});
     setSaved(null);
     try {
-      await api("/expenses", { body: { itemName, categoryId, amount, spentOn, note: note || undefined } });
-      setSaved(`Logged ${itemName} (${formatNaira(typed ?? 0)})`);
+      const q = Number(quantity);
+      const parsedUnit = parseAmount(unitPrice);
+      const qtySuffix = q > 1 && parsedUnit ? `${q} @ ${formatNaira(parsedUnit)} each` : null;
+      const finalNote = note.trim()
+        ? qtySuffix ? `${note.trim()} (${qtySuffix})` : note.trim()
+        : qtySuffix || undefined;
+
+      await api("/expenses", { body: { itemName, categoryId, amount, spentOn, note: finalNote } });
+      setSaved(`Logged ${itemName} (${formatNaira(typed ?? 0)})${qtySuffix ? ` · ${qtySuffix}` : ""}`);
       setItemName("");
+      setQuantity("1");
+      setUnitPrice("");
       setAmount("");
       setNote("");
       await Promise.all([summary.reload(), recent.reload()]);
@@ -78,15 +133,43 @@ export default function LogExpensePage() {
               autoFocus
             />
           </Field>
-          <Field label="Price (₦)" error={fields.amount}>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Quantity / Number bought">
+              <input
+                className="input"
+                type="number"
+                min="1"
+                step="any"
+                value={quantity}
+                onChange={(e) => onQuantityChange(e.target.value)}
+                placeholder="1"
+              />
+            </Field>
+            <Field label="Unit price (₦)">
+              <input
+                className="input"
+                inputMode="decimal"
+                value={unitPrice}
+                onChange={(e) => onUnitPriceChange(e.target.value)}
+                placeholder="0.00"
+              />
+            </Field>
+          </div>
+
+          <Field label="Total price (₦)" error={fields.amount}>
             <input
               className="input"
               inputMode="decimal"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => onAmountChange(e.target.value)}
               placeholder="0.00"
               aria-invalid={!!fields.amount}
             />
+            {calcBreakdown && (
+              <p className="mt-1 text-xs font-medium text-brand">
+                Calculation: {calcBreakdown}
+              </p>
+            )}
           </Field>
           <Field label="Category" error={fields.categoryId}>
             <select
