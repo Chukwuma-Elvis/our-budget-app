@@ -37,16 +37,11 @@ function MonthPicker() {
         onChange={(e) => setMonth(e.target.value)}
         aria-label="Month"
       >
-        {months.map((m) => {
-          const isNext = m === maxMonth && m > currentMonth;
-          const isCurr = m === currentMonth;
-          const suffix = isNext ? " (Next month)" : isCurr ? " (Current)" : "";
-          return (
-            <option key={m} value={m}>
-              {monthLabel(m)}{suffix}
-            </option>
-          );
-        })}
+        {months.map((m) => (
+          <option key={m} value={m}>
+            {monthLabel(m)}
+          </option>
+        ))}
       </select>
       <button
         className="btn btn-ghost px-2"

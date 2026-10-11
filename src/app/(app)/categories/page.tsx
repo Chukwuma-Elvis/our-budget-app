@@ -215,7 +215,7 @@ export default function CategoriesPage() {
               : "btn-ghost border border-border text-muted hover:text-fg"
           }`}
         >
-          {monthLabel(currentMonth)} (Current)
+          {monthLabel(currentMonth)}
         </button>
         <button
           type="button"
@@ -226,7 +226,7 @@ export default function CategoriesPage() {
               : "btn-ghost border border-border text-muted hover:text-fg"
           }`}
         >
-          {monthLabel(nextMonth)} (Next month) ↗
+          {monthLabel(nextMonth)}
         </button>
       </div>
 
