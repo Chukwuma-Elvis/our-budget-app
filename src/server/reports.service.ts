@@ -23,7 +23,9 @@ export async function monthSummary(accountId: string, month: string) {
   const end = monthEnd(month);
 
   const [budgets, spentGroups] = await Promise.all([
-    db.budget.findMany({ where: { accountId, month: start } }),
+    db.budget.findMany({
+      where: { accountId, month: start, category: { archivedAt: null } },
+    }),
     db.expense.groupBy({
       by: ["categoryId"],
       where: { accountId, spentOn: { gte: start, lt: end } },
@@ -33,34 +35,50 @@ export async function monthSummary(accountId: string, month: string) {
 
   const budgetBy = new Map(budgets.map((b) => [b.categoryId, b.amount]));
   const spentBy = new Map(spentGroups.map((g) => [g.categoryId, g._sum.amount ?? ZERO]));
-  const touched = new Set([...budgetBy.keys(), ...spentBy.keys()]);
+
+  const spentCategoryIds = [...spentBy.entries()]
+    .filter(([_, amount]) => !amount.isZero())
+    .map(([id]) => id);
 
   const categories = await db.category.findMany({
-    where: { accountId, OR: [{ archivedAt: null }, { id: { in: [...touched] } }] },
+    where: {
+      accountId,
+      OR: [{ archivedAt: null }, { id: { in: spentCategoryIds } }],
+    },
     orderBy: { name: "asc" },
   });
 
   let totalBudget = ZERO;
   let totalSpent = ZERO;
-  const rows: SummaryRow[] = categories.map((c) => {
-    const budget = budgetBy.get(c.id) ?? ZERO;
+  const rows: SummaryRow[] = [];
+
+  for (const c of categories) {
+    const isArchived = c.archivedAt !== null;
     const spent = spentBy.get(c.id) ?? ZERO;
+
+    // A category removed for or before this month must never add to total budget.
+    const budget = isArchived ? ZERO : (budgetBy.get(c.id) ?? ZERO);
+
+    // If an archived category had no spend in this month, remove it completely.
+    if (isArchived && spent.isZero()) continue;
+
     totalBudget = totalBudget.add(budget);
     totalSpent = totalSpent.add(spent);
     const status = spendStatus(spent.toNumber(), budget.toNumber());
-    return {
+
+    rows.push({
       categoryId: c.id,
       name: c.name,
       color: c.color,
-      archived: c.archivedAt !== null,
+      archived: isArchived,
       budget: budget.toFixed(2),
       spent: spent.toFixed(2),
       remaining: budget.sub(spent).toFixed(2),
       percent: percentUsed(spent.toNumber(), budget.toNumber()),
       status,
       overdrawn: status === "overdrawn",
-    };
-  });
+    });
+  }
 
   const totalStatus = spendStatus(totalSpent.toNumber(), totalBudget.toNumber());
   return {
@@ -90,9 +108,13 @@ export async function monthlyTotals(accountId: string, from?: string, to?: strin
       WHERE account_id = ${accountId}::uuid AND spent_on >= ${lower}::date AND spent_on < ${upper}::date
       GROUP BY 1`,
     db.$queryRaw<{ month: string; total: Prisma.Decimal }[]>`
-      SELECT to_char(month, 'YYYY-MM') AS month, SUM(amount) AS total
-      FROM budgets
-      WHERE account_id = ${accountId}::uuid AND month >= ${lower}::date AND month < ${upper}::date
+      SELECT to_char(b.month, 'YYYY-MM') AS month, SUM(b.amount) AS total
+      FROM budgets b
+      JOIN categories c ON c.id = b.category_id
+      WHERE b.account_id = ${accountId}::uuid
+        AND c.archived_at IS NULL
+        AND b.month >= ${lower}::date
+        AND b.month < ${upper}::date
       GROUP BY 1`,
   ]);
 
@@ -133,10 +155,14 @@ export async function spendByUser(accountId: string, month: string) {
 /** Months that have any budget or expense, newest first. Always includes the current month. */
 export async function availableMonths(accountId: string): Promise<string[]> {
   const rows = await db.$queryRaw<{ month: string }[]>`
-    SELECT to_char(spent_on, 'YYYY-MM') AS month FROM expenses WHERE account_id = ${accountId}::uuid
+    SELECT to_char(e.spent_on, 'YYYY-MM') AS month FROM expenses e WHERE e.account_id = ${accountId}::uuid
     UNION
-    SELECT to_char(month, 'YYYY-MM') AS month FROM budgets WHERE account_id = ${accountId}::uuid`;
+    SELECT to_char(b.month, 'YYYY-MM') AS month
+    FROM budgets b
+    JOIN categories c ON c.id = b.category_id
+    WHERE b.account_id = ${accountId}::uuid AND c.archived_at IS NULL`;
   const set = new Set(rows.map((r) => r.month));
   set.add(currentMonthKey());
   return [...set].sort().reverse();
 }
+

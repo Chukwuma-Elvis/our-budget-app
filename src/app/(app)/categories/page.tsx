@@ -37,7 +37,11 @@ function BudgetRow({
     setSaving(true);
     onError(null);
     try {
-      await api(`/budgets/${row.categoryId}/${month}`, { method: "PUT", body: { amount: parsed } });
+      if (Number(parsed) <= 0) {
+        await api(`/budgets/${row.categoryId}/${month}`, { method: "DELETE" });
+      } else {
+        await api(`/budgets/${row.categoryId}/${month}`, { method: "PUT", body: { amount: parsed } });
+      }
       await onChanged();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Could not save budget");
@@ -46,10 +50,24 @@ function BudgetRow({
     }
   }
 
+  async function clearFromMonth() {
+    onError(null);
+    setSaving(true);
+    try {
+      await api(`/budgets/${row.categoryId}/${month}`, { method: "DELETE" });
+      setValue("");
+      await onChanged();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Could not remove budget for this month");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function remove() {
     if (
       !window.confirm(
-        `Remove "${row.name}"? Past expenses stay in your history, but you won't be able to log new ones in it.`,
+        `Remove "${row.name}" completely? It will be removed from all months and will not add to any budget. Past expenses remain in history.`,
       )
     )
       return;
@@ -69,7 +87,7 @@ function BudgetRow({
           <span aria-hidden className="size-3 rounded-full" style={{ background: row.color }} />
           {row.name}
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <label className="flex items-center gap-1 text-sm">
             <span className="sr-only">Budget for {row.name}</span>
             <span aria-hidden className="text-muted">
@@ -86,8 +104,22 @@ function BudgetRow({
               disabled={saving}
             />
           </label>
-          <button className="btn btn-ghost text-danger" onClick={remove} aria-label={`Remove ${row.name}`}>
-            Remove
+          {Number(row.budget) > 0 && (
+            <button
+              className="btn btn-ghost !px-2 text-xs"
+              onClick={clearFromMonth}
+              title={`Remove ${row.name} from this month's budget`}
+            >
+              Clear month
+            </button>
+          )}
+          <button
+            className="btn btn-ghost !px-2 text-xs text-danger"
+            onClick={remove}
+            title={`Delete ${row.name} completely`}
+            aria-label={`Delete ${row.name}`}
+          >
+            Delete
           </button>
         </div>
       </div>

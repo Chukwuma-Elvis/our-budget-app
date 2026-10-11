@@ -15,7 +15,7 @@ export function SpendingReport({ month }: { month: string }) {
   if (summary.loading && !summary.data) return <Loading />;
   if (summary.error || !summary.data) return <ErrorNote message={summary.error ?? "Could not load"} />;
   const s = summary.data;
-  const rows = s.categories.filter((c) => !c.archived || Number(c.spent) > 0 || Number(c.budget) > 0);
+  const rows = s.categories.filter((c) => Number(c.budget) > 0 || Number(c.spent) > 0);
   const pie = rows.filter((c) => Number(c.spent) > 0).map((c) => ({ name: c.name, value: Number(c.spent), color: c.color }));
 
   return (

@@ -4,7 +4,7 @@ import type { Summary } from "@/lib/client";
 import { Money, SpendBar, StatusNote } from "./ui";
 
 export function CategoryProgress({ summary }: { summary: Summary }) {
-  const rows = summary.categories.filter((c) => !c.archived || Number(c.spent) > 0 || Number(c.budget) > 0);
+  const rows = summary.categories.filter((c) => Number(c.budget) > 0 || Number(c.spent) > 0);
   return (
     <ul className="divide-y divide-border">
       {rows.map((c) => (

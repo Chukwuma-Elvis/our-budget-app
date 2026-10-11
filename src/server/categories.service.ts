@@ -70,11 +70,14 @@ export async function updateCategory(
   return toCategoryDto(row);
 }
 
-/** Removing a category archives it, so past expenses and reports keep working. */
+/** Removing a category archives it, so past expenses keep working, but clears its budgets so it never adds to total budget. */
 export async function archiveCategory(accountId: string, id: string) {
   const category = await db.category.findFirst({ where: { id, accountId, archivedAt: null } });
   if (!category) throw notFound("Category not found");
-  await db.category.update({ where: { id }, data: { archivedAt: new Date() } });
+  await db.$transaction([
+    db.category.update({ where: { id }, data: { archivedAt: new Date() } }),
+    db.budget.deleteMany({ where: { categoryId: id, accountId } }),
+  ]);
 }
 
 /** Adds the suggested categories that do not exist yet. Returns how many were created. */
