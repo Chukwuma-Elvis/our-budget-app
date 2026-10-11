@@ -1,15 +1,24 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { currentMonthKey, isMonthKey } from "@/lib/dates";
+import { addMonths, currentMonthKey, isMonthKey } from "@/lib/dates";
 
-type MonthCtx = { month: string; setMonth: (m: string) => void; isCurrent: boolean };
+type MonthCtx = {
+  month: string;
+  setMonth: (m: string) => void;
+  isCurrent: boolean;
+  isFuture: boolean;
+  currentMonth: string;
+  nextMonth: string;
+};
 
 const Ctx = createContext<MonthCtx | null>(null);
 const KEY = "bt_month";
 
 export function MonthProvider({ children }: { children: ReactNode }) {
-  const [month, setMonthState] = useState(currentMonthKey());
+  const currentMonth = currentMonthKey();
+  const nextMonth = addMonths(currentMonth, 1);
+  const [month, setMonthState] = useState(currentMonth);
 
   useEffect(() => {
     try {
@@ -29,7 +38,20 @@ export function MonthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  return <Ctx.Provider value={{ month, setMonth, isCurrent: month === currentMonthKey() }}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider
+      value={{
+        month,
+        setMonth,
+        isCurrent: month === currentMonth,
+        isFuture: month > currentMonth,
+        currentMonth,
+        nextMonth,
+      }}
+    >
+      {children}
+    </Ctx.Provider>
+  );
 }
 
 export function useMonth(): MonthCtx {

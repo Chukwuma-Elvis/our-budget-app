@@ -137,7 +137,7 @@ function BudgetRow({
 }
 
 export default function CategoriesPage() {
-  const { month } = useMonth();
+  const { month, setMonth, currentMonth, nextMonth, isFuture } = useMonth();
   const summary = useFetch<Summary>(`/reports/summary?month=${month}`);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -203,6 +203,45 @@ export default function CategoriesPage() {
           Copy {monthLabel(addMonths(month, -1))} budgets
         </button>
       </PageTitle>
+
+      {/* Quick Month Switcher for Planning Ahead */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setMonth(currentMonth)}
+          className={`btn min-h-9 px-3.5 text-xs font-semibold transition ${
+            month === currentMonth
+              ? "btn-primary shadow-xs"
+              : "btn-ghost border border-border text-muted hover:text-fg"
+          }`}
+        >
+          {monthLabel(currentMonth)} (Current)
+        </button>
+        <button
+          type="button"
+          onClick={() => setMonth(nextMonth)}
+          className={`btn min-h-9 px-3.5 text-xs font-semibold transition ${
+            month === nextMonth
+              ? "btn-primary shadow-xs"
+              : "btn-ghost border border-border text-muted hover:text-fg"
+          }`}
+        >
+          {monthLabel(nextMonth)} (Next month) ↗
+        </button>
+      </div>
+
+      {isFuture && (
+        <div className="rounded-xl border border-brand/30 bg-ok-soft p-3.5 text-xs sm:text-sm text-brand">
+          <div className="flex items-center gap-2 font-semibold">
+            <span>📅</span>
+            <span>Planning ahead for {monthLabel(nextMonth)}</span>
+          </div>
+          <p className="mt-1 text-brand/90">
+            You are setting budgets for next month. You can assign category amounts below, or click{" "}
+            <strong>Copy {monthLabel(addMonths(month, -1))} budgets</strong> above to duplicate your current budgets into next month.
+          </p>
+        </div>
+      )}
 
       <ErrorNote message={error ?? summary.error} />
       {info && (

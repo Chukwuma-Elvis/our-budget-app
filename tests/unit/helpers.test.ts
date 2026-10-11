@@ -101,6 +101,11 @@ describe("dates", () => {
     expect(addMonths("2026-12", 1)).toBe("2027-01");
   });
 
+  it("computes next month key for budgeting ahead", () => {
+    expect(addMonths("2026-10", 1)).toBe("2026-11");
+    expect(addMonths("2026-12", 1)).toBe("2027-01");
+  });
+
   it("uses Lagos time for the current day (UTC+1)", () => {
     // 23:30 UTC on the 31st is already the 1st in Lagos.
     expect(todayLagos(new Date("2026-10-31T23:30:00Z"))).toBe("2026-11-01");

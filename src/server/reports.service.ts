@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { currentMonthKey, monthEnd, monthStart } from "@/lib/dates";
+import { addMonths, currentMonthKey, monthEnd, monthStart } from "@/lib/dates";
 import { percentUsed, spendStatus, type SpendStatus } from "@/lib/status";
 
 const ZERO = new Prisma.Decimal(0);
@@ -152,7 +152,7 @@ export async function spendByUser(accountId: string, month: string) {
   });
 }
 
-/** Months that have any budget or expense, newest first. Always includes the current month. */
+/** Months that have any budget or expense, newest first. Always includes current month and next month for planning ahead. */
 export async function availableMonths(accountId: string): Promise<string[]> {
   const rows = await db.$queryRaw<{ month: string }[]>`
     SELECT to_char(e.spent_on, 'YYYY-MM') AS month FROM expenses e WHERE e.account_id = ${accountId}::uuid
@@ -162,7 +162,9 @@ export async function availableMonths(accountId: string): Promise<string[]> {
     JOIN categories c ON c.id = b.category_id
     WHERE b.account_id = ${accountId}::uuid AND c.archived_at IS NULL`;
   const set = new Set(rows.map((r) => r.month));
-  set.add(currentMonthKey());
+  const current = currentMonthKey();
+  set.add(current);
+  set.add(addMonths(current, 1));
   return [...set].sort().reverse();
 }
 

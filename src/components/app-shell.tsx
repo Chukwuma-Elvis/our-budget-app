@@ -19,11 +19,12 @@ const NAV = [
 ];
 
 function MonthPicker() {
-  const { month, setMonth } = useMonth();
+  const { month, setMonth, currentMonth, nextMonth } = useMonth();
   const { data } = useFetch<{ months: string[] }>("/reports/months");
-  const months = Array.from(new Set([...(data?.months ?? []), month, currentMonthKey()])).sort().reverse();
+  const maxMonth = nextMonth;
+  const months = Array.from(new Set([...(data?.months ?? []), month, currentMonth, maxMonth])).sort().reverse();
   const next = addMonths(month, 1);
-  const canGoForward = next <= currentMonthKey();
+  const canGoForward = next <= maxMonth;
 
   return (
     <div className="flex items-center gap-1">
@@ -31,16 +32,21 @@ function MonthPicker() {
         ‹
       </button>
       <select
-        className="input !w-auto !py-1.5 text-sm"
+        className="input !w-auto !py-1.5 text-sm cursor-pointer"
         value={month}
         onChange={(e) => setMonth(e.target.value)}
         aria-label="Month"
       >
-        {months.map((m) => (
-          <option key={m} value={m}>
-            {monthLabel(m)}
-          </option>
-        ))}
+        {months.map((m) => {
+          const isNext = m === maxMonth && m > currentMonth;
+          const isCurr = m === currentMonth;
+          const suffix = isNext ? " (Next month)" : isCurr ? " (Current)" : "";
+          return (
+            <option key={m} value={m}>
+              {monthLabel(m)}{suffix}
+            </option>
+          );
+        })}
       </select>
       <button
         className="btn btn-ghost px-2"
@@ -57,7 +63,7 @@ function MonthPicker() {
 function Shell({ userName, children }: { userName: string; children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { month, isCurrent } = useMonth();
+  const { month, isCurrent, isFuture } = useMonth();
 
   async function logout() {
     await api("/auth/logout", { method: "POST", body: {} });
@@ -96,8 +102,14 @@ function Shell({ userName, children }: { userName: string; children: ReactNode }
           <MonthPicker />
           <div className="flex items-center gap-2">
             {!isCurrent && (
-              <span className="hidden rounded-full bg-warn-soft px-2 py-0.5 text-xs text-warn sm:inline">
-                Viewing {monthLabel(month)}
+              <span
+                className={`hidden rounded-full px-2.5 py-0.5 text-xs font-semibold sm:inline ${
+                  isFuture ? "bg-brand/10 text-brand" : "bg-warn-soft text-warn"
+                }`}
+              >
+                {isFuture
+                  ? `Planning for ${monthLabel(month)}`
+                  : `Viewing past: ${monthLabel(month)}`}
               </span>
             )}
             <span className="hidden text-sm text-muted sm:inline">{userName}</span>
