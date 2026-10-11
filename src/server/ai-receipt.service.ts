@@ -203,17 +203,22 @@ async function callGemini(
   mimeType: string,
   prompt: string,
 ): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const cleanKey = apiKey.trim().replace(/^["']|["']$/g, "");
+  const normalizedMime = mimeType === "image/jpg" ? "image/jpeg" : mimeType;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`;
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": cleanKey,
+    },
     body: JSON.stringify({
       contents: [
         {
           parts: [
             {
               inlineData: {
-                mimeType,
+                mimeType: normalizedMime,
                 data: base64Data,
               },
             },
@@ -232,7 +237,16 @@ async function callGemini(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Gemini API error (${response.status}): ${errorBody}`);
+    let parsedMessage = errorBody;
+    try {
+      const errJson = JSON.parse(errorBody) as { error?: { message?: string } };
+      if (errJson?.error?.message) {
+        parsedMessage = errJson.error.message;
+      }
+    } catch {
+      // retain errorBody
+    }
+    throw new Error(`Gemini (${model}) ${response.status}: ${parsedMessage}`);
   }
 
   const json = (await response.json()) as {
@@ -245,7 +259,7 @@ async function callGemini(
 
   const candidateText = json.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!candidateText) {
-    throw new Error("Gemini returned an empty response");
+    throw new Error(`Gemini (${model}) returned an empty response`);
   }
 
   return candidateText;
@@ -257,11 +271,13 @@ async function callOpenAi(
   mimeType: string,
   prompt: string,
 ): Promise<string> {
+  const cleanKey = apiKey.trim().replace(/^["']|["']$/g, "");
+  const normalizedMime = mimeType === "image/jpg" ? "image/jpeg" : mimeType;
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${cleanKey}`,
     },
     body: JSON.stringify({
       model: "gpt-4o-mini",
@@ -273,7 +289,7 @@ async function callOpenAi(
             {
               type: "image_url",
               image_url: {
-                url: `data:${mimeType};base64,${base64Data}`,
+                url: `data:${normalizedMime};base64,${base64Data}`,
               },
             },
           ],
@@ -286,7 +302,16 @@ async function callOpenAi(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`OpenAI API error (${response.status}): ${errorBody}`);
+    let parsedMessage = errorBody;
+    try {
+      const errJson = JSON.parse(errorBody) as { error?: { message?: string } };
+      if (errJson?.error?.message) {
+        parsedMessage = errJson.error.message;
+      }
+    } catch {
+      // retain errorBody
+    }
+    throw new Error(`OpenAI ${response.status}: ${parsedMessage}`);
   }
 
   const json = (await response.json()) as {
@@ -313,14 +338,17 @@ export async function scanReceipt(
     throw badRequest("No image data provided");
   }
 
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  const openaiKey = process.env.OPENAI_API_KEY;
+  const rawGeminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  const rawOpenaiKey = process.env.OPENAI_API_KEY;
+
+  const geminiKey = rawGeminiKey ? rawGeminiKey.trim().replace(/^["']|["']$/g, "") : null;
+  const openaiKey = rawOpenaiKey ? rawOpenaiKey.trim().replace(/^["']|["']$/g, "") : null;
 
   if (!geminiKey && !openaiKey) {
     throw new AppError(
       503,
       "ai_not_configured",
-      "Receipt scanning requires an AI key. Please add GEMINI_API_KEY to your environment variables.",
+      "Receipt scanning requires an API key. Please add GEMINI_API_KEY to your environment variables.",
     );
   }
 
@@ -329,14 +357,14 @@ export async function scanReceipt(
   let lastError: Error | null = null;
 
   if (geminiKey) {
-    try {
-      rawAiText = await callGemini(geminiKey, "gemini-2.0-flash", base64Data, mimeType, prompt);
-    } catch (err) {
-      console.warn("Gemini 2.0 Flash failed, falling back to gemini-1.5-flash:", err);
+    const models = ["gemini-2.0-flash", "gemini-1.5-flash"];
+    for (const model of models) {
       try {
-        rawAiText = await callGemini(geminiKey, "gemini-1.5-flash", base64Data, mimeType, prompt);
-      } catch (err2) {
-        lastError = err2 instanceof Error ? err2 : new Error(String(err2));
+        rawAiText = await callGemini(geminiKey, model, base64Data, mimeType, prompt);
+        if (rawAiText) break;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        console.warn(`Gemini model ${model} failed:`, lastError.message);
       }
     }
   }
@@ -346,13 +374,15 @@ export async function scanReceipt(
       rawAiText = await callOpenAi(openaiKey, base64Data, mimeType, prompt);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      console.warn("OpenAI fallback failed:", lastError.message);
     }
   }
 
   if (!rawAiText) {
+    const detailMsg = lastError?.message ? ` (${lastError.message})` : "";
     console.error("AI receipt scan error:", lastError);
     throw badRequest(
-      "Could not analyze the receipt with AI. Please check your image clarity or API key configuration.",
+      `Could not analyze the receipt with AI${detailMsg}. Please check your API key configuration.`,
     );
   }
 
