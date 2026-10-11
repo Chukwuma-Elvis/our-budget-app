@@ -332,34 +332,39 @@ async function callGroq(
   base64Data: string,
   mimeType: string,
   prompt: string,
+  useJsonFormat = true,
 ): Promise<string> {
   const cleanKey = apiKey.trim().replace(/^["']|["']$/g, "");
   const normalizedMime = mimeType === "image/jpg" ? "image/jpeg" : mimeType;
+  const payload: Record<string, unknown> = {
+    model,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:${normalizedMime};base64,${base64Data}`,
+            },
+          },
+        ],
+      },
+    ],
+    temperature: 0.1,
+  };
+  if (useJsonFormat) {
+    payload.response_format = { type: "json_object" };
+  }
+
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${cleanKey}`,
     },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${normalizedMime};base64,${base64Data}`,
-              },
-            },
-          ],
-        },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.1,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -373,6 +378,11 @@ async function callGroq(
     } catch {
       // retain errorBody
     }
+
+    if (useJsonFormat && /response_format|json/i.test(parsedMessage)) {
+      return callGroq(apiKey, model, base64Data, mimeType, prompt, false);
+    }
+
     throw new Error(`Groq (${model}) ${response.status}: ${parsedMessage}`);
   }
 
@@ -386,6 +396,32 @@ async function callGroq(
   }
 
   return text;
+}
+
+async function getGroqVisionModels(apiKey: string): Promise<string[]> {
+  const cleanKey = apiKey.trim().replace(/^["']|["']$/g, "");
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/models", {
+      headers: { Authorization: `Bearer ${cleanKey}` },
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { data?: Array<{ id: string; active?: boolean }> };
+      if (Array.isArray(json.data)) {
+        const found = json.data
+          .filter((m) => m.active !== false)
+          .map((m) => m.id)
+          .filter(
+            (id) =>
+              /qwen.*vision|qwen3\.8|vision/i.test(id) &&
+              !/decommissioned|deprecated|llama-3\.2.*vision/i.test(id),
+          );
+        if (found.length > 0) return found;
+      }
+    }
+  } catch (err) {
+    console.warn("Could not query Groq models API:", err);
+  }
+  return ["qwen/qwen3.8-27b"];
 }
 
 export async function scanReceipt(
@@ -421,7 +457,7 @@ export async function scanReceipt(
   let lastError: Error | null = null;
 
   if (groqKey) {
-    const groqModels = ["llama-3.2-11b-vision-preview", "llama-3.2-90b-vision-preview"];
+    const groqModels = await getGroqVisionModels(groqKey);
     for (const model of groqModels) {
       try {
         rawAiText = await callGroq(groqKey, model, base64Data, mimeType, prompt);
