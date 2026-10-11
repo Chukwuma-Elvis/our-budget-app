@@ -9,7 +9,7 @@ import {
   monthStart,
   todayLagos,
 } from "@/lib/dates";
-import { formatNaira, parseAmount } from "@/lib/money";
+import { formatNaira, parseAmount, updatePriceFields } from "@/lib/money";
 import { normalizePhone } from "@/lib/phone";
 import { percentUsed, spendStatus } from "@/lib/status";
 import { rpConfig } from "@/lib/webauthn";
@@ -124,4 +124,96 @@ describe("webauthn config", () => {
     expect(config.origin).toMatch(/^https?:\/\//);
   });
 });
+
+describe("updatePriceFields", () => {
+  it("calculates unit price automatically when total price and quantity are input", () => {
+    // 1. Initial state
+    const initial = { quantity: "1", unitPrice: "", amount: "" };
+
+    // 2. User enters total price 5000 (quantity default 1)
+    const withTotal = updatePriceFields(initial, { amount: "5000" });
+    expect(withTotal.amount).toBe("5000");
+    expect(withTotal.unitPrice).toBe("5000.00");
+
+    // 3. User enters quantity 5 -> unit price must be calculated automatically as 1000.00!
+    const withQty = updatePriceFields(withTotal, { quantity: "5" });
+    expect(withQty.amount).toBe("5000");
+    expect(withQty.quantity).toBe("5");
+    expect(withQty.unitPrice).toBe("1000.00");
+  });
+
+  it("calculates unit price automatically when quantity is entered before total price", () => {
+    const initial = { quantity: "1", unitPrice: "", amount: "" };
+
+    // 1. User enters quantity 4
+    const withQty = updatePriceFields(initial, { quantity: "4" });
+    expect(withQty.quantity).toBe("4");
+    expect(withQty.unitPrice).toBe("");
+    expect(withQty.amount).toBe("");
+
+    // 2. User enters total price 12000 -> unit price must be 3000.00
+    const withTotal = updatePriceFields(withQty, { amount: "12000" });
+    expect(withTotal.amount).toBe("12000");
+    expect(withTotal.unitPrice).toBe("3000.00");
+  });
+
+  it("calculates total price automatically when unit price and quantity are input", () => {
+    const initial = { quantity: "1", unitPrice: "", amount: "" };
+
+    // 1. User enters unit price 250
+    const withUnit = updatePriceFields(initial, { unitPrice: "250" });
+    expect(withUnit.unitPrice).toBe("250");
+    expect(withUnit.amount).toBe("250.00");
+
+    // 2. User enters quantity 4 -> total price must be 1000.00
+    const withQty = updatePriceFields(withUnit, { quantity: "4" });
+    expect(withQty.quantity).toBe("4");
+    expect(withQty.unitPrice).toBe("250");
+    expect(withQty.amount).toBe("1000.00");
+  });
+
+  it("recalculates unit price when quantity changes after total price was edited", () => {
+    const state = {
+      quantity: "2",
+      unitPrice: "500.00",
+      amount: "1000",
+      lastEditedPrice: "amount" as const,
+    };
+
+    const next = updatePriceFields(state, { quantity: "4" });
+    expect(next.amount).toBe("1000");
+    expect(next.unitPrice).toBe("250.00");
+  });
+
+  it("allows clearing unit price and total price without feedback loop", () => {
+    const state = {
+      quantity: "2",
+      unitPrice: "500.00",
+      amount: "1000.00",
+      lastEditedPrice: "amount" as const,
+    };
+
+    const clearedUnit = updatePriceFields(state, { unitPrice: "" });
+    expect(clearedUnit.unitPrice).toBe("");
+    expect(clearedUnit.amount).toBe("");
+
+    const clearedTotal = updatePriceFields(state, { amount: "" });
+    expect(clearedTotal.unitPrice).toBe("");
+    expect(clearedTotal.amount).toBe("");
+  });
+
+  it("allows setting unit price to 0 and does not overwrite it", () => {
+    const state = {
+      quantity: "3",
+      unitPrice: "500.00",
+      amount: "1500.00",
+      lastEditedPrice: "unitPrice" as const,
+    };
+
+    const zeroed = updatePriceFields(state, { unitPrice: "0" });
+    expect(zeroed.unitPrice).toBe("0");
+    expect(zeroed.amount).toBe("0.00");
+  });
+});
+
 

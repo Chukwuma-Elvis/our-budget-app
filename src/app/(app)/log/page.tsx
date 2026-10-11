@@ -12,7 +12,7 @@ import {
   type Summary,
 } from "@/lib/client";
 import { todayLagos } from "@/lib/dates";
-import { formatNaira, parseAmount } from "@/lib/money";
+import { formatNaira, parseAmount, updatePriceFields } from "@/lib/money";
 import { ReceiptScannerModal } from "@/components/receipt-scanner-modal";
 
 type LogItem = {
@@ -23,6 +23,7 @@ type LogItem = {
   amount: string;
   categoryId: string;
   note: string;
+  lastEditedPrice?: "unitPrice" | "amount";
 };
 
 export default function LogExpensePage() {
@@ -71,47 +72,24 @@ export default function LogExpensePage() {
     setItems((prev) =>
       prev.map((it) => {
         if (it.id !== id) return it;
-        const next = { ...it, ...updates };
+        const prices = updatePriceFields(
+          {
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            amount: it.amount,
+            lastEditedPrice: it.lastEditedPrice,
+          },
+          updates,
+        );
 
-        if ("unitPrice" in updates) {
-          // Editing unitPrice directly: never overwrite user-entered unitPrice!
-          if (next.unitPrice.trim() === "") {
-            next.amount = "";
-          } else {
-            const parsedUnit = parseAmount(next.unitPrice);
-            const q = Number(next.quantity) > 0 ? Number(next.quantity) : 1;
-            if (parsedUnit !== null) {
-              next.amount = (q * Number(parsedUnit)).toFixed(2);
-            }
-          }
-        } else if ("amount" in updates) {
-          // Editing amount directly: never overwrite user-entered amount!
-          if (next.amount.trim() === "") {
-            next.unitPrice = "";
-          } else {
-            const parsedTotal = parseAmount(next.amount);
-            const q = Number(next.quantity) > 0 ? Number(next.quantity) : 1;
-            if (parsedTotal !== null) {
-              next.unitPrice = (Number(parsedTotal) / q).toFixed(2);
-            }
-          }
-        } else if ("quantity" in updates) {
-          // Editing quantity: re-derive amount from unit price if present, otherwise unit price from amount
-          const q = Number(next.quantity);
-          if (q > 0) {
-            const parsedUnit = parseAmount(next.unitPrice);
-            if (parsedUnit !== null) {
-              next.amount = (q * Number(parsedUnit)).toFixed(2);
-            } else {
-              const parsedTotal = parseAmount(next.amount);
-              if (parsedTotal !== null) {
-                next.unitPrice = (Number(parsedTotal) / q).toFixed(2);
-              }
-            }
-          }
-        }
-
-        return next;
+        return {
+          ...it,
+          ...updates,
+          quantity: prices.quantity,
+          unitPrice: prices.unitPrice,
+          amount: prices.amount,
+          lastEditedPrice: prices.lastEditedPrice,
+        };
       }),
     );
   }

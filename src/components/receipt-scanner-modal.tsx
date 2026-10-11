@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ErrorNote, Money } from "./ui";
 import { api, type Category } from "@/lib/client";
-import { formatNaira, parseAmount } from "@/lib/money";
+import { formatNaira, parseAmount, updatePriceFields } from "@/lib/money";
 import { todayLagos } from "@/lib/dates";
 import { compressImageFile } from "@/lib/image-compress";
 import type { ParsedReceiptResult } from "@/server/ai-receipt.service";
@@ -23,6 +23,7 @@ type EditableItem = {
   totalPrice: string;
   categoryId: string;
   included: boolean;
+  lastEditedPrice?: "unitPrice" | "totalPrice";
 };
 
 type ScanStep = "upload" | "scanning" | "review";
@@ -136,45 +137,28 @@ export function ReceiptScannerModal({
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
-        const next = { ...item, ...updates };
+        const prices = updatePriceFields(
+          {
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            amount: item.totalPrice,
+            lastEditedPrice: item.lastEditedPrice ? (item.lastEditedPrice === "totalPrice" ? "amount" : "unitPrice") : undefined,
+          },
+          {
+            quantity: updates.quantity,
+            unitPrice: updates.unitPrice,
+            amount: updates.totalPrice,
+          },
+        );
 
-        // Auto-recalculate amounts safely
-        if ("unitPrice" in updates) {
-          if (next.unitPrice.trim() === "") {
-            next.totalPrice = "";
-          } else {
-            const parsedUnit = parseAmount(next.unitPrice);
-            const q = Number(next.quantity) > 0 ? Number(next.quantity) : 1;
-            if (parsedUnit !== null) {
-              next.totalPrice = (q * Number(parsedUnit)).toFixed(2);
-            }
-          }
-        } else if ("totalPrice" in updates) {
-          if (next.totalPrice.trim() === "") {
-            next.unitPrice = "";
-          } else {
-            const parsedTotal = parseAmount(next.totalPrice);
-            const q = Number(next.quantity) > 0 ? Number(next.quantity) : 1;
-            if (parsedTotal !== null) {
-              next.unitPrice = (Number(parsedTotal) / q).toFixed(2);
-            }
-          }
-        } else if ("quantity" in updates) {
-          const q = Number(next.quantity);
-          if (q > 0) {
-            const parsedUnit = parseAmount(next.unitPrice);
-            if (parsedUnit !== null) {
-              next.totalPrice = (q * Number(parsedUnit)).toFixed(2);
-            } else {
-              const parsedTotal = parseAmount(next.totalPrice);
-              if (parsedTotal !== null) {
-                next.unitPrice = (Number(parsedTotal) / q).toFixed(2);
-              }
-            }
-          }
-        }
-
-        return next;
+        return {
+          ...item,
+          ...updates,
+          quantity: prices.quantity,
+          unitPrice: prices.unitPrice,
+          totalPrice: prices.amount,
+          lastEditedPrice: prices.lastEditedPrice ? (prices.lastEditedPrice === "amount" ? "totalPrice" : "unitPrice") : undefined,
+        };
       }),
     );
   }

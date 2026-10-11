@@ -24,3 +24,79 @@ export function parseAmount(input: string): string | null {
   const [whole, fraction = ""] = cleaned.split(".");
   return `${whole.replace(/^0+(?=\d)/, "")}.${fraction.padEnd(2, "0")}`;
 }
+
+export type PriceCalculationState = {
+  quantity: string;
+  unitPrice: string;
+  amount: string;
+  lastEditedPrice?: "unitPrice" | "amount";
+};
+
+/**
+ * Calculates unit price from total price and quantity, or total price from unit price and quantity.
+ * Automatically respects whichever price field the user entered last, avoiding feedback loops.
+ */
+export function updatePriceFields(
+  current: PriceCalculationState,
+  update: { quantity?: string; unitPrice?: string; amount?: string; totalPrice?: string },
+): PriceCalculationState {
+  const nextAmt = update.amount ?? update.totalPrice;
+  const next: PriceCalculationState = {
+    ...current,
+    ...(update.quantity !== undefined ? { quantity: update.quantity } : {}),
+    ...(update.unitPrice !== undefined ? { unitPrice: update.unitPrice } : {}),
+    ...(nextAmt !== undefined ? { amount: nextAmt } : {}),
+  };
+
+  if ("unitPrice" in update) {
+    next.lastEditedPrice = "unitPrice";
+    if (next.unitPrice.trim() === "") {
+      next.amount = "";
+      next.lastEditedPrice = undefined;
+    } else {
+      const parsedUnit = parseAmount(next.unitPrice);
+      const q = Number(next.quantity) > 0 ? Number(next.quantity) : 1;
+      if (parsedUnit !== null) {
+        next.amount = (q * Number(parsedUnit)).toFixed(2);
+      }
+    }
+  } else if ("amount" in update || "totalPrice" in update) {
+    next.lastEditedPrice = "amount";
+    if (next.amount.trim() === "") {
+      next.unitPrice = "";
+      next.lastEditedPrice = undefined;
+    } else {
+      const parsedTotal = parseAmount(next.amount);
+      const q = Number(next.quantity) > 0 ? Number(next.quantity) : 1;
+      if (parsedTotal !== null) {
+        next.unitPrice = (Number(parsedTotal) / q).toFixed(2);
+      }
+    }
+  } else if ("quantity" in update) {
+    const q = Number(next.quantity);
+    if (q > 0) {
+      const preferTotal =
+        next.lastEditedPrice === "amount" ||
+        (!next.lastEditedPrice && Boolean(next.amount) && !next.unitPrice);
+
+      if (preferTotal) {
+        const parsedTotal = parseAmount(next.amount);
+        if (parsedTotal !== null) {
+          next.unitPrice = (Number(parsedTotal) / q).toFixed(2);
+        }
+      } else {
+        const parsedUnit = parseAmount(next.unitPrice);
+        if (parsedUnit !== null) {
+          next.amount = (q * Number(parsedUnit)).toFixed(2);
+        } else {
+          const parsedTotal = parseAmount(next.amount);
+          if (parsedTotal !== null) {
+            next.unitPrice = (Number(parsedTotal) / q).toFixed(2);
+          }
+        }
+      }
+    }
+  }
+
+  return next;
+}

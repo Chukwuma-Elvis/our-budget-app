@@ -14,7 +14,7 @@ import {
   type Me,
 } from "@/lib/client";
 import { formatDate, monthLabel } from "@/lib/dates";
-import { parseAmount } from "@/lib/money";
+import { parseAmount, updatePriceFields } from "@/lib/money";
 
 type AuditEntry = {
   id: string;
@@ -38,47 +38,37 @@ function EditModal({ expense, onClose, onSaved }: { expense: Expense; onClose: (
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [lastEditedPrice, setLastEditedPrice] = useState<"unitPrice" | "amount">("amount");
 
   function onQuantityChange(val: string) {
     setQuantity(val);
-    const q = Number(val);
-    if (q > 0) {
-      const parsedUnit = parseAmount(unitPrice);
-      if (parsedUnit !== null) {
-        setAmount((q * Number(parsedUnit)).toFixed(2));
-      } else {
-        const parsedTotal = parseAmount(amount);
-        if (parsedTotal !== null) {
-          setUnitPrice((Number(parsedTotal) / q).toFixed(2));
-        }
-      }
-    }
+    const updated = updatePriceFields(
+      { quantity: val, unitPrice, amount, lastEditedPrice },
+      { quantity: val },
+    );
+    setUnitPrice(updated.unitPrice);
+    setAmount(updated.amount);
+    if (updated.lastEditedPrice) setLastEditedPrice(updated.lastEditedPrice);
   }
 
   function onUnitPriceChange(val: string) {
     setUnitPrice(val);
-    if (val.trim() === "") {
-      setAmount("");
-      return;
-    }
-    const parsed = parseAmount(val);
-    const q = Number(quantity) > 0 ? Number(quantity) : 1;
-    if (parsed !== null) {
-      setAmount((q * Number(parsed)).toFixed(2));
-    }
+    const updated = updatePriceFields(
+      { quantity, unitPrice: val, amount, lastEditedPrice },
+      { unitPrice: val },
+    );
+    setAmount(updated.amount);
+    if (updated.lastEditedPrice) setLastEditedPrice(updated.lastEditedPrice);
   }
 
   function onAmountChange(val: string) {
     setAmount(val);
-    if (val.trim() === "") {
-      setUnitPrice("");
-      return;
-    }
-    const parsed = parseAmount(val);
-    const q = Number(quantity) > 0 ? Number(quantity) : 1;
-    if (parsed !== null) {
-      setUnitPrice((Number(parsed) / q).toFixed(2));
-    }
+    const updated = updatePriceFields(
+      { quantity, unitPrice, amount: val, lastEditedPrice },
+      { amount: val },
+    );
+    setUnitPrice(updated.unitPrice);
+    if (updated.lastEditedPrice) setLastEditedPrice(updated.lastEditedPrice);
   }
 
   async function submit(e: FormEvent) {
