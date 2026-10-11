@@ -57,6 +57,10 @@ function EditModal({ expense, onClose, onSaved }: { expense: Expense; onClose: (
 
   function onUnitPriceChange(val: string) {
     setUnitPrice(val);
+    if (val.trim() === "") {
+      setAmount("");
+      return;
+    }
     const parsed = parseAmount(val);
     const q = Number(quantity) > 0 ? Number(quantity) : 1;
     if (parsed !== null) {
@@ -66,6 +70,10 @@ function EditModal({ expense, onClose, onSaved }: { expense: Expense; onClose: (
 
   function onAmountChange(val: string) {
     setAmount(val);
+    if (val.trim() === "") {
+      setUnitPrice("");
+      return;
+    }
     const parsed = parseAmount(val);
     const q = Number(quantity) > 0 ? Number(quantity) : 1;
     if (parsed !== null) {
@@ -106,6 +114,7 @@ function EditModal({ expense, onClose, onSaved }: { expense: Expense; onClose: (
               type="number"
               min="1"
               step="any"
+              inputMode="numeric"
               value={quantity}
               onChange={(e) => onQuantityChange(e.target.value)}
               placeholder="1"

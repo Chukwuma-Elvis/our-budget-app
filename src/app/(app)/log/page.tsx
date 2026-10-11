@@ -73,22 +73,41 @@ export default function LogExpensePage() {
         if (it.id !== id) return it;
         const next = { ...it, ...updates };
 
-        if ("quantity" in updates || "unitPrice" in updates) {
-          const q = Number(next.quantity);
-          const parsedUnit = parseAmount(next.unitPrice);
-          if (q > 0 && parsedUnit !== null) {
-            next.amount = (q * Number(parsedUnit)).toFixed(2);
-          } else if (q > 0) {
+        if ("unitPrice" in updates) {
+          // Editing unitPrice directly: never overwrite user-entered unitPrice!
+          if (next.unitPrice.trim() === "") {
+            next.amount = "";
+          } else {
+            const parsedUnit = parseAmount(next.unitPrice);
+            const q = Number(next.quantity) > 0 ? Number(next.quantity) : 1;
+            if (parsedUnit !== null) {
+              next.amount = (q * Number(parsedUnit)).toFixed(2);
+            }
+          }
+        } else if ("amount" in updates) {
+          // Editing amount directly: never overwrite user-entered amount!
+          if (next.amount.trim() === "") {
+            next.unitPrice = "";
+          } else {
             const parsedTotal = parseAmount(next.amount);
+            const q = Number(next.quantity) > 0 ? Number(next.quantity) : 1;
             if (parsedTotal !== null) {
               next.unitPrice = (Number(parsedTotal) / q).toFixed(2);
             }
           }
-        } else if ("amount" in updates) {
-          const q = Number(next.quantity) > 0 ? Number(next.quantity) : 1;
-          const parsedTotal = parseAmount(next.amount);
-          if (parsedTotal !== null) {
-            next.unitPrice = (Number(parsedTotal) / q).toFixed(2);
+        } else if ("quantity" in updates) {
+          // Editing quantity: re-derive amount from unit price if present, otherwise unit price from amount
+          const q = Number(next.quantity);
+          if (q > 0) {
+            const parsedUnit = parseAmount(next.unitPrice);
+            if (parsedUnit !== null) {
+              next.amount = (q * Number(parsedUnit)).toFixed(2);
+            } else {
+              const parsedTotal = parseAmount(next.amount);
+              if (parsedTotal !== null) {
+                next.unitPrice = (Number(parsedTotal) / q).toFixed(2);
+              }
+            }
           }
         }
 
@@ -242,8 +261,8 @@ export default function LogExpensePage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <form onSubmit={onSubmit} className="card space-y-4" noValidate>
-          {/* Shared Date Field */}
-          <div className="flex items-center justify-between border-b border-border pb-3">
+          {/* Top Bar: Shared Date & Live Running Total */}
+          <div className="flex flex-col gap-3 rounded-xl bg-card/60 p-3 sm:flex-row sm:items-center sm:justify-between sm:bg-transparent sm:p-0 sm:border-b sm:border-border sm:pb-3">
             <div className="w-full sm:w-1/2">
               <Field label="Date" error={fields.spentOn}>
                 <input
@@ -256,23 +275,30 @@ export default function LogExpensePage() {
                 />
               </Field>
             </div>
-            <div className="hidden sm:block text-right">
-              <span className="text-xs text-muted">Total to log</span>
-              <div className="text-lg font-bold">
+            <div className="flex items-center justify-between border-t border-border/50 pt-2 sm:border-0 sm:pt-0 sm:block sm:text-right">
+              <span className="text-xs font-medium text-muted">Total to log</span>
+              <div className="text-lg font-bold text-brand sm:text-foreground">
                 <Money value={totalAmount} />
               </div>
             </div>
           </div>
 
           {/* Items Section Header */}
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold">
-              {items.length === 1 ? "Expense Item" : `Expense Items (${items.length})`}
-            </span>
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold">
+                {items.length === 1 ? "Expense Item" : `Expense Items (${items.length})`}
+              </span>
+              {items.length > 1 && (
+                <span className="rounded-full bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">
+                  Batch
+                </span>
+              )}
+            </div>
             <button
               type="button"
               onClick={addItem}
-              className="btn btn-ghost h-8 text-xs font-semibold text-brand hover:bg-brand/10"
+              className="btn btn-ghost min-h-9 h-9 px-3 text-xs font-semibold text-brand hover:bg-brand/10 active:scale-95"
               title="Add another item before saving"
             >
               ＋ Add item
@@ -293,25 +319,33 @@ export default function LogExpensePage() {
               return (
                 <div
                   key={item.id}
-                  className={`rounded-xl border border-border bg-card p-3.5 space-y-3 transition ${
+                  className={`rounded-xl border border-border bg-card p-3.5 sm:p-4 space-y-3.5 transition ${
                     items.length > 1 ? "shadow-xs" : ""
                   }`}
                 >
-                  {items.length > 1 && (
-                    <div className="flex items-center justify-between border-b border-border/60 pb-2">
-                      <span className="text-xs font-bold text-muted uppercase tracking-wider">
+                  <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center justify-center rounded-md bg-muted/15 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-muted">
                         Item #{index + 1}
                       </span>
+                      {parsedTotal && Number(parsedTotal) > 0 && (
+                        <span className="text-xs font-semibold text-brand">
+                          {formatNaira(parsedTotal)}
+                        </span>
+                      )}
+                    </div>
+                    {items.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeItem(item.id)}
-                        className="btn btn-ghost h-7 px-2 text-xs text-danger hover:bg-danger-soft"
+                        className="btn btn-ghost min-h-8 h-8 px-2.5 text-xs font-medium text-danger hover:bg-danger-soft active:scale-95"
                         title="Remove this item"
+                        aria-label={`Remove item ${index + 1}`}
                       >
                         🗑 Remove
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   <Field label="What did you buy?" error={fields[`items.${index}.itemName`]}>
                     <input
@@ -320,16 +354,18 @@ export default function LogExpensePage() {
                       onChange={(e) => updateItem(item.id, { itemName: e.target.value })}
                       placeholder="e.g. Bag of rice"
                       autoFocus={index === 0}
+                      enterKeyHint="next"
                     />
                   </Field>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Quantity / Number bought">
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                    <Field label="Quantity">
                       <input
                         className="input"
                         type="number"
                         min="1"
                         step="any"
+                        inputMode="numeric"
                         value={item.quantity}
                         onChange={(e) => updateItem(item.id, { quantity: e.target.value })}
                         placeholder="1"
@@ -355,15 +391,16 @@ export default function LogExpensePage() {
                       placeholder="0.00"
                     />
                     {calcBreakdown && (
-                      <p className="mt-1 text-xs font-medium text-brand">
-                        Calculation: {calcBreakdown}
-                      </p>
+                      <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-brand/10 px-2.5 py-1 text-xs font-medium text-brand">
+                        <span>ℹ</span>
+                        <span>Calculation: {calcBreakdown}</span>
+                      </div>
                     )}
                   </Field>
 
                   <Field label="Category" error={fields[`items.${index}.categoryId`]}>
                     <select
-                      className="input"
+                      className="input cursor-pointer"
                       value={item.categoryId}
                       onChange={(e) => updateItem(item.id, { categoryId: e.target.value })}
                     >
@@ -382,6 +419,7 @@ export default function LogExpensePage() {
                       value={item.note}
                       onChange={(e) => updateItem(item.id, { note: e.target.value })}
                       placeholder="Optional note"
+                      enterKeyHint="done"
                     />
                   </Field>
                 </div>
@@ -393,9 +431,9 @@ export default function LogExpensePage() {
           <button
             type="button"
             onClick={addItem}
-            className="btn w-full border-dashed border-2 hover:border-brand hover:bg-brand/5 flex items-center justify-center gap-2 py-3 text-sm font-semibold text-brand transition"
+            className="btn w-full min-h-12 border-dashed border-2 border-border/80 hover:border-brand hover:bg-brand/5 active:scale-[0.98] flex items-center justify-center gap-2 py-3 text-sm font-semibold text-brand transition-all rounded-xl"
           >
-            <span>＋</span>
+            <span className="text-base leading-none">＋</span>
             <span>Add another expense item</span>
           </button>
 
@@ -405,12 +443,14 @@ export default function LogExpensePage() {
 
           {/* Budget Impact Alerts */}
           {categoryImpactHints.length > 0 && (
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {categoryImpactHints.map((hint) => (
                 <div
                   key={hint.name}
-                  className={`rounded-lg px-3 py-2 text-sm ${
-                    hint.over ? "bg-danger-soft text-danger" : "bg-ok-soft text-brand"
+                  className={`rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-medium border ${
+                    hint.over
+                      ? "border-danger/30 bg-danger-soft text-danger"
+                      : "border-brand/30 bg-ok-soft text-brand"
                   }`}
                   role="status"
                 >
@@ -439,9 +479,9 @@ export default function LogExpensePage() {
           )}
 
           {/* Submit Button (Greyed out until compulsory fields are filled) */}
-          <div className="space-y-1.5 pt-2">
+          <div className="space-y-2 pt-2">
             <button
-              className="btn btn-primary w-full"
+              className="btn btn-primary w-full min-h-12 text-base font-semibold transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
               type="submit"
               disabled={!allCompulsoryFilled || busy}
             >

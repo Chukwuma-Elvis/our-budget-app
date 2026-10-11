@@ -29,6 +29,9 @@ describe("money", () => {
     expect(parseAmount("₦ 1,200.5")).toBe("1200.50");
     expect(parseAmount("007")).toBe("7.00");
     expect(parseAmount("0.99")).toBe("0.99");
+    expect(parseAmount("0")).toBe("0.00");
+    expect(parseAmount("0.0")).toBe("0.00");
+    expect(parseAmount("0.00")).toBe("0.00");
   });
 
   it("rejects invalid amounts", () => {

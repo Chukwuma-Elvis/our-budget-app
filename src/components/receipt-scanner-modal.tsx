@@ -138,18 +138,39 @@ export function ReceiptScannerModal({
         if (item.id !== id) return item;
         const next = { ...item, ...updates };
 
-        // Auto-recalculate amounts
-        if ("quantity" in updates || "unitPrice" in updates) {
-          const q = Number(next.quantity);
-          const parsedUnit = parseAmount(next.unitPrice);
-          if (q > 0 && parsedUnit !== null) {
-            next.totalPrice = (q * Number(parsedUnit)).toFixed(2);
+        // Auto-recalculate amounts safely
+        if ("unitPrice" in updates) {
+          if (next.unitPrice.trim() === "") {
+            next.totalPrice = "";
+          } else {
+            const parsedUnit = parseAmount(next.unitPrice);
+            const q = Number(next.quantity) > 0 ? Number(next.quantity) : 1;
+            if (parsedUnit !== null) {
+              next.totalPrice = (q * Number(parsedUnit)).toFixed(2);
+            }
           }
         } else if ("totalPrice" in updates) {
-          const q = Number(next.quantity) > 0 ? Number(next.quantity) : 1;
-          const parsedTotal = parseAmount(next.totalPrice);
-          if (parsedTotal !== null) {
-            next.unitPrice = (Number(parsedTotal) / q).toFixed(2);
+          if (next.totalPrice.trim() === "") {
+            next.unitPrice = "";
+          } else {
+            const parsedTotal = parseAmount(next.totalPrice);
+            const q = Number(next.quantity) > 0 ? Number(next.quantity) : 1;
+            if (parsedTotal !== null) {
+              next.unitPrice = (Number(parsedTotal) / q).toFixed(2);
+            }
+          }
+        } else if ("quantity" in updates) {
+          const q = Number(next.quantity);
+          if (q > 0) {
+            const parsedUnit = parseAmount(next.unitPrice);
+            if (parsedUnit !== null) {
+              next.totalPrice = (q * Number(parsedUnit)).toFixed(2);
+            } else {
+              const parsedTotal = parseAmount(next.totalPrice);
+              if (parsedTotal !== null) {
+                next.unitPrice = (Number(parsedTotal) / q).toFixed(2);
+              }
+            }
           }
         }
 
@@ -557,8 +578,9 @@ export function ReceiptScannerModal({
                       <button
                         type="button"
                         onClick={() => removeItem(item.id)}
-                        className="mt-1 h-8 w-8 text-muted hover:text-danger rounded-lg transition"
+                        className="mt-1 flex min-h-9 min-w-9 items-center justify-center text-muted hover:text-danger hover:bg-danger-soft active:scale-95 rounded-lg transition"
                         title="Remove item"
+                        aria-label={`Remove item ${index + 1}`}
                       >
                         🗑
                       </button>
