@@ -11,6 +11,7 @@ const NAV = [
   { href: "/", label: "Dashboard", icon: "▦" },
   { href: "/log", label: "Log expense", icon: "＋" },
   { href: "/ledger", label: "Ledger", icon: "☰" },
+  { href: "/shopping-list", label: "Shopping list", icon: "🛒" },
   { href: "/categories", label: "Budgets", icon: "◎" },
   { href: "/spending", label: "By category", icon: "◔" },
   { href: "/monthly", label: "Monthly", icon: "▥" },
@@ -121,7 +122,7 @@ function Shell({ userName, children }: { userName: string; children: ReactNode }
         aria-label="Main"
       >
         {NAV.slice(0, 5)
-          .concat(NAV[7])
+          .concat(NAV[8])
           .map((n) => {
             const active = n.href === "/" ? pathname === "/" : pathname.startsWith(n.href);
             return (

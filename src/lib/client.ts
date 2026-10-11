@@ -116,3 +116,20 @@ export type Me = {
   canInvite: boolean;
   passkeys: { id: string; deviceLabel: string; createdAt: string; lastUsedAt: string | null }[];
 };
+
+export type ShoppingItem = {
+  id: string;
+  itemName: string;
+  quantity: string;
+  unitPrice: string | null;
+  amount: string;
+  categoryId: string;
+  category: Category;
+  purchased: boolean;
+  purchasedAt: string | null;
+  expenseId: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+

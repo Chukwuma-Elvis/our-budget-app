@@ -22,9 +22,14 @@ export default function DashboardPage() {
   return (
     <div className="space-y-4">
       <PageTitle title={monthLabel(month)}>
-        <Link href="/log" className="btn btn-primary">
-          ＋ Log expense
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/shopping-list" className="btn btn-ghost text-sm min-h-[40px] flex items-center gap-1.5 border border-border">
+            🛒 Shopping list
+          </Link>
+          <Link href="/log" className="btn btn-primary min-h-[40px] flex items-center">
+            ＋ Log expense
+          </Link>
+        </div>
       </PageTitle>
 
       <SetupChecklist summary={s} hasExpenses={(anyExpenses.data?.total ?? 0) > 0} />

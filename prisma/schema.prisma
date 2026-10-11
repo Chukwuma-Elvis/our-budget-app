@@ -20,6 +20,7 @@ model Account {
   expenses          Expense[]
   recurringExpenses RecurringExpense[]
   expenseAudits     ExpenseAudit[]
+  shoppingItems     ShoppingItem[]
 
   @@map("accounts")
 }
@@ -44,6 +45,7 @@ model User {
   expensesUpdated   Expense[]          @relation("ExpenseUpdatedBy")
   recurringCreated  RecurringExpense[]
   audits            ExpenseAudit[]
+  shoppingItemsCreated ShoppingItem[]
 
   @@index([accountId])
   @@map("users")
@@ -108,6 +110,7 @@ model Category {
   budgets   Budget[]
   expenses  Expense[]
   recurring RecurringExpense[]
+  shoppingItems ShoppingItem[]
 
   @@index([accountId])
   @@map("categories")
@@ -151,6 +154,7 @@ model Expense {
   creator   User              @relation("ExpenseCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
   updater   User?             @relation("ExpenseUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
   recurring RecurringExpense? @relation(fields: [recurringId], references: [id], onDelete: SetNull)
+  shoppingItems ShoppingItem[]
 
   @@index([accountId, spentOn(sort: Desc)])
   @@index([categoryId, spentOn])
@@ -194,4 +198,30 @@ model RecurringExpense {
 
   @@index([active, nextRunOn])
   @@map("recurring_expenses")
+}
+
+model ShoppingItem {
+  id          String    @id @default(uuid()) @db.Uuid
+  accountId   String    @map("account_id") @db.Uuid
+  itemName    String    @map("item_name")
+  quantity    String    @default("1")
+  unitPrice   Decimal?  @map("unit_price") @db.Decimal(14, 2)
+  amount      Decimal   @db.Decimal(14, 2)
+  categoryId  String    @map("category_id") @db.Uuid
+  purchased   Boolean   @default(false)
+  purchasedAt DateTime? @map("purchased_at") @db.Timestamptz
+  expenseId   String?   @map("expense_id") @db.Uuid
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdBy   String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  account  Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  expense  Expense?  @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  creator  User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([accountId, purchased])
+  @@index([accountId, createdAt(sort: Desc)])
+  @@map("shopping_items")
 }

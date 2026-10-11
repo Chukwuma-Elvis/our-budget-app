@@ -140,3 +140,30 @@ export const expenseBatchItemSchema = z.object({
 export const expenseBatchSchema = z.object({
   items: z.array(expenseBatchItemSchema).min(1, "Select at least one item to save").max(100),
 });
+
+export const shoppingItemCreateSchema = z.object({
+  itemName: z.string().trim().min(1, "Enter the item name").max(120),
+  categoryId: z.uuid("Choose a category"),
+  quantity: z.string().trim().min(1, "Enter a quantity").max(50).default("1"),
+  unitPrice: amountSchema.nullable().optional(),
+  amount: positiveAmountSchema,
+});
+
+export const shoppingItemUpdateSchema = z.object({
+  itemName: z.string().trim().min(1, "Enter the item name").max(120).optional(),
+  categoryId: z.uuid().optional(),
+  quantity: z.string().trim().min(1).max(50).optional(),
+  unitPrice: amountSchema.nullable().optional(),
+  amount: positiveAmountSchema.optional(),
+  purchased: z.boolean().optional(),
+});
+
+export const shoppingImportSchema = z.object({
+  month: monthSchema.optional(),
+  categoryId: z.uuid().optional(),
+});
+
+export const shoppingItemReorderSchema = z.object({
+  ids: z.array(z.uuid()).min(1),
+});
+
