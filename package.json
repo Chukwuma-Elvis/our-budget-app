@@ -10,7 +10,7 @@
     "test": "vitest run",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "vercel-build": "prisma generate && prisma migrate deploy && next build"
+    "vercel-build": "node scripts/build.mjs"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",

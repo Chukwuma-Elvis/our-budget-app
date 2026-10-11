@@ -12,6 +12,7 @@ import {
 import { formatNaira, parseAmount } from "@/lib/money";
 import { normalizePhone } from "@/lib/phone";
 import { percentUsed, spendStatus } from "@/lib/status";
+import { rpConfig } from "@/lib/webauthn";
 
 describe("money", () => {
   it("formats naira with two decimals", () => {
@@ -112,3 +113,12 @@ describe("dates", () => {
     expect(advanceDate("2026-12-15", "monthly")).toBe("2027-01-15");
   });
 });
+
+describe("webauthn config", () => {
+  it("resolves rpID and origin with fallbacks", () => {
+    const config = rpConfig();
+    expect(config.rpID).toBeDefined();
+    expect(config.origin).toMatch(/^https?:\/\//);
+  });
+});
+
