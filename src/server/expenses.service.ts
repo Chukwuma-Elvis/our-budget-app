@@ -87,6 +87,50 @@ export async function createExpense(
   });
 }
 
+export async function createExpensesBatch(
+  accountId: string,
+  userId: string,
+  items: Array<{ itemName: string; categoryId: string; amount: string; spentOn?: string; note?: string }>,
+) {
+  if (items.length === 0) return [];
+  const categoryIds = [...new Set(items.map((i) => i.categoryId))];
+  const activeCategories = await db.category.findMany({
+    where: { id: { in: categoryIds }, accountId, archivedAt: null },
+    select: { id: true },
+  });
+  const activeSet = new Set(activeCategories.map((c) => c.id));
+  for (const item of items) {
+    if (!activeSet.has(item.categoryId)) {
+      throw badRequest("One or more selected categories are invalid or inactive", {
+        categoryId: "Choose an active category",
+      });
+    }
+  }
+
+  return db.$transaction(async (tx) => {
+    const results: ExpenseDto[] = [];
+    for (const item of items) {
+      const row = await tx.expense.create({
+        data: {
+          accountId,
+          categoryId: item.categoryId,
+          itemName: item.itemName,
+          amount: new Prisma.Decimal(item.amount),
+          spentOn: dateFromString(item.spentOn ?? todayLagos()),
+          note: item.note || null,
+          createdBy: userId,
+        },
+        include,
+      });
+      await tx.expenseAudit.create({
+        data: { accountId, expenseId: row.id, action: "create", actorId: userId, after: snapshot(row) },
+      });
+      results.push(toDto(row));
+    }
+    return results;
+  });
+}
+
 export async function updateExpense(
   accountId: string,
   userId: string,

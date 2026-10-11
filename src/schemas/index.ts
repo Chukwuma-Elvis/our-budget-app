@@ -121,3 +121,22 @@ export const passkeyVerifySchema = z.object({
   response: z.any(),
   deviceLabel: z.string().trim().max(60).optional(),
 });
+
+export const receiptScanSchema = z.object({
+  imageBase64: z.string().min(1, "Receipt image is required"),
+  mimeType: z
+    .enum(["image/jpeg", "image/png", "image/webp", "image/heic", "image/jpg"])
+    .default("image/jpeg"),
+});
+
+export const expenseBatchItemSchema = z.object({
+  itemName: z.string().trim().min(1, "Enter the item name").max(120),
+  categoryId: z.uuid("Choose a category"),
+  amount: positiveAmountSchema,
+  spentOn: dateSchema.optional(),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const expenseBatchSchema = z.object({
+  items: z.array(expenseBatchItemSchema).min(1, "Select at least one item to save").max(100),
+});

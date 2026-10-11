@@ -13,9 +13,11 @@ import {
 } from "@/lib/client";
 import { todayLagos } from "@/lib/dates";
 import { formatNaira, parseAmount } from "@/lib/money";
+import { ReceiptScannerModal } from "@/components/receipt-scanner-modal";
 
 export default function LogExpensePage() {
   const categories = useFetch<{ categories: Category[] }>("/categories");
+  const [showScanner, setShowScanner] = useState(false);
   const [spentOn, setSpentOn] = useState(todayLagos());
   const [categoryId, setCategoryId] = useState("");
   const [itemName, setItemName] = useState("");
@@ -120,7 +122,15 @@ export default function LogExpensePage() {
 
   return (
     <div className="space-y-4">
-      <PageTitle title="Log an expense" />
+      <PageTitle title="Log an expense">
+        <button
+          type="button"
+          onClick={() => setShowScanner(true)}
+          className="btn btn-primary"
+        >
+          📷 Scan Receipt with AI
+        </button>
+      </PageTitle>
       <div className="grid gap-4 lg:grid-cols-2">
         <form onSubmit={onSubmit} className="card space-y-3" noValidate>
           <Field label="What did you buy?" error={fields.itemName}>
@@ -245,6 +255,20 @@ export default function LogExpensePage() {
           {recent.loading && !recent.data ? <Loading /> : <ExpenseList items={recent.data?.items ?? []} />}
         </section>
       </div>
+
+      <ReceiptScannerModal
+        isOpen={showScanner}
+        onClose={() => setShowScanner(false)}
+        categories={cats}
+        onSuccess={async (count, merchantName) => {
+          setSaved(
+            `Logged ${count} ${count === 1 ? "expense" : "expenses"}${
+              merchantName ? ` from ${merchantName}` : ""
+            } to your ledger`
+          );
+          await Promise.all([summary.reload(), recent.reload()]);
+        }}
+      />
     </div>
   );
 }
