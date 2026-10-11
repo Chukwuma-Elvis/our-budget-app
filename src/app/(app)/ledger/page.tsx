@@ -232,7 +232,7 @@ export default function LedgerPage() {
   return (
     <div className="space-y-4">
       <PageTitle title="Ledger">
-        <a className="btn" href={`/api/export/expenses.csv?${filterQuery}`}>
+        <a className="btn w-full sm:w-auto" href={`/api/export/expenses.csv?${filterQuery}`}>
           Download CSV
         </a>
       </PageTitle>

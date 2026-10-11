@@ -126,7 +126,7 @@ export default function LogExpensePage() {
         <button
           type="button"
           onClick={() => setShowScanner(true)}
-          className="btn btn-primary"
+          className="btn btn-primary w-full sm:w-auto"
         >
           📷 Scan Receipt with AI
         </button>

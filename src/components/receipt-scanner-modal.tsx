@@ -273,7 +273,7 @@ export function ReceiptScannerModal({
         role="dialog"
         aria-modal="true"
         aria-label="Scan Receipt with AI"
-        className="flex max-h-[95vh] w-full flex-col rounded-t-2xl bg-card p-4 sm:max-w-4xl sm:rounded-2xl sm:p-6 shadow-2xl"
+        className="flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-card p-4 pb-[max(1rem,calc(0.75rem+env(safe-area-inset-bottom,0px)))] sm:max-w-4xl sm:rounded-2xl sm:p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -299,7 +299,7 @@ export function ReceiptScannerModal({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto py-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain py-4">
           <ErrorNote message={error} />
 
           {/* STEP 1: Upload / Take Picture */}
@@ -603,21 +603,21 @@ export function ReceiptScannerModal({
         </div>
 
         {/* Modal Footer Actions */}
-        <div className="border-t border-border pt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="border-t border-border pt-4 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5">
           {step === "review" ? (
             <>
               <button
                 type="button"
-                className="btn btn-ghost text-xs"
+                className="btn btn-ghost text-xs w-full sm:w-auto"
                 onClick={() => setStep("upload")}
                 disabled={saving}
               >
                 ← Retake / Scan Another
               </button>
-              <div className="flex gap-2">
+              <div className="flex w-full sm:w-auto gap-2">
                 <button
                   type="button"
-                  className="btn"
+                  className="btn flex-1 sm:flex-initial"
                   onClick={onClose}
                   disabled={saving}
                 >
@@ -625,7 +625,7 @@ export function ReceiptScannerModal({
                 </button>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="btn btn-primary flex-1 sm:flex-initial"
                   onClick={onSaveExpenses}
                   disabled={saving || includedItems.length === 0}
                 >
@@ -633,7 +633,7 @@ export function ReceiptScannerModal({
                     ? "Adding to Ledger…"
                     : `Add ${includedItems.length} ${
                         includedItems.length === 1 ? "Item" : "Items"
-                      } to Ledger (${formatNaira(selectedTotal)})`}
+                      } (${formatNaira(selectedTotal)})`}
                 </button>
               </div>
             </>
@@ -641,7 +641,7 @@ export function ReceiptScannerModal({
             <div className="w-full flex justify-end">
               <button
                 type="button"
-                className="btn"
+                className="btn w-full sm:w-auto"
                 onClick={onClose}
                 disabled={step === "scanning"}
               >

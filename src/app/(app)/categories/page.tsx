@@ -87,7 +87,7 @@ function BudgetRow({
           <span aria-hidden className="size-3 rounded-full" style={{ background: row.color }} />
           {row.name}
         </span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
           <label className="flex items-center gap-1 text-sm">
             <span className="sr-only">Budget for {row.name}</span>
             <span aria-hidden className="text-muted">
@@ -199,7 +199,7 @@ export default function CategoriesPage() {
   return (
     <div className="space-y-4">
       <PageTitle title={`Budgets · ${monthLabel(month)}`}>
-        <button className="btn" onClick={copyPrevious}>
+        <button className="btn w-full sm:w-auto" onClick={copyPrevious}>
           Copy {monthLabel(addMonths(month, -1))} budgets
         </button>
       </PageTitle>

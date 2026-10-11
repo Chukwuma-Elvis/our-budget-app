@@ -126,7 +126,7 @@ export default function RecurringPage() {
                     {!i.active && " · paused"}
                   </div>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 w-full sm:w-auto justify-end">
                   <button className="btn" onClick={() => toggle(i)}>
                     {i.active ? "Pause" : "Resume"}
                   </button>

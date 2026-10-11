@@ -91,8 +91,8 @@ function Shell({ userName, children }: { userName: string; children: ReactNode }
         </nav>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border bg-bg/90 px-4 py-2 backdrop-blur">
+      <div className="flex min-w-0 flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border bg-bg/95 px-4 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pb-2 backdrop-blur">
           <MonthPicker />
           <div className="flex items-center gap-2">
             {!isCurrent && (
@@ -101,7 +101,7 @@ function Shell({ userName, children }: { userName: string; children: ReactNode }
               </span>
             )}
             <span className="hidden text-sm text-muted sm:inline">{userName}</span>
-            <button className="btn btn-ghost text-sm" onClick={logout}>
+            <button className="btn btn-ghost text-sm min-h-9" onClick={logout}>
               Sign out
             </button>
           </div>
@@ -110,7 +110,7 @@ function Shell({ userName, children }: { userName: string; children: ReactNode }
       </div>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-border bg-card md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur md:hidden"
         aria-label="Main"
       >
         {NAV.slice(0, 5)
@@ -122,14 +122,14 @@ function Shell({ userName, children }: { userName: string; children: ReactNode }
                 key={n.href}
                 href={n.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-w-16 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[11px] ${
-                  active ? "font-semibold text-brand" : "text-muted"
+                className={`flex min-w-14 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 min-h-12 text-[11px] touch-manipulation transition-transform active:scale-95 ${
+                  active ? "font-semibold text-brand" : "text-muted hover:text-fg"
                 }`}
               >
-                <span aria-hidden className="text-base">
+                <span aria-hidden className="text-base leading-none">
                   {n.icon}
                 </span>
-                {n.label.split(" ")[0]}
+                <span>{n.label.split(" ")[0]}</span>
               </Link>
             );
           })}
