@@ -110,7 +110,7 @@ select {
     }
   }
   .btn-primary {
-    @apply border-transparent bg-brand text-brand-fg;
+    @apply border-transparent bg-brand text-brand-fg disabled:border-border disabled:bg-border/60 disabled:text-muted disabled:opacity-60;
   }
   .btn-danger {
     @apply border-transparent bg-danger text-white;
